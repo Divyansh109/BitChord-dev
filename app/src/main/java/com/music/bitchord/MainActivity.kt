@@ -192,6 +192,7 @@ import com.music.bitchord.data.sources.TrackMatcher
 import com.music.bitchord.ui.screens.SpotifyCanvasAuthScreen
 import com.music.bitchord.ui.screens.SpotifyLibraryScreen
 import com.music.bitchord.data.spotify.SPOTIFY_PAGE_PREFIX
+import com.music.bitchord.data.spotify.SpotifyLibrary
 import com.music.bitchord.playback.AudioCache
 import com.music.bitchord.playback.LinkRequest
 import com.music.bitchord.playback.MusicLink
@@ -869,6 +870,33 @@ private fun BitChordApp(
     val homeRecentlyPlayedLoading by viewModel.homeRecentlyPlayedLoading.collectAsStateWithLifecycle()
     val topPicks by viewModel.topPicks.collectAsStateWithLifecycle()
     val topPicksLoading by viewModel.topPicksLoading.collectAsStateWithLifecycle()
+    // Spotify playlists for Home: fetched whenever the Spotify sign-in changes,
+    // empty (so no shelf) while signed out or if the request fails.
+    val spotifyCookie by AppSettings.spotifySpdcToken.collectAsStateWithLifecycle()
+    var spotifyHomeShelf by remember { mutableStateOf<HomeShelf?>(null) }
+    LaunchedEffect(spotifyCookie) {
+        if (spotifyCookie.isBlank()) {
+            spotifyHomeShelf = null
+            return@LaunchedEffect
+        }
+        runCatching { SpotifyLibrary.playlists() }
+            .onSuccess { playlists ->
+                spotifyHomeShelf = HomeShelf(
+                    title = "Your Spotify playlists",
+                    subtitle = "Songs play through YouTube Music",
+                    items = playlists.map { playlist ->
+                        ShelfItem(
+                            title = playlist.name,
+                            subtitle = playlist.owner ?: "Spotify",
+                            thumbnailUrl = playlist.imageUrl,
+                            videoId = null,
+                            browseId = SPOTIFY_PAGE_PREFIX + playlist.id,
+                        )
+                    },
+                )
+            }
+            .onFailure { spotifyHomeShelf = null }
+    }
 
     // The top bar's icon is the quiet, always-there nudge; this is the
     // once-per-launch popup version of the same news. `updateDialogShown`
@@ -3418,6 +3446,7 @@ private fun BitChordApp(
                                 topPicksLoading = topPicksLoading,
                                 listenerName = account?.name,
                                 // Neither shelf is drawn without its callback.
+                                spotifyShelf = spotifyHomeShelf,
                                 onTopPickClick = openTopPick.takeUnless { hideTopPicks },
                                 onMoodClick = playMood.takeUnless { hideHomeMoods },
                                 onMoodsShowAll = { navigator.push(AppRoute.Moods) },
