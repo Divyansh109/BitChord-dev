@@ -158,6 +158,12 @@ fun HomeScreen(
     onMoodsShowAll: () -> Unit = {},
     /** Whether the Top Picks and mood artwork may animate — see [LocalArtworkMotion]. */
     artworkMotion: Boolean = true,
+    /**
+     * The signed-in Spotify account's playlists (Liked Songs first) as one
+     * shelf above the feed. Null or empty draws nothing. A tap goes through
+     * [onItemClick] like any card; its browse id carries the Spotify page prefix.
+     */
+    spotifyShelf: HomeShelf? = null,
 ) {
     // Top Picks' pictures and motion wait for the feed — see LocalArtworkImages.
     val feedReady = state !is UiState.Loading
@@ -214,6 +220,14 @@ fun HomeScreen(
                         )
                     }
                     topPicks == null && topPicksLoading -> topPicksSkeleton()
+                }
+            }
+            spotifyShelf?.takeIf { it.items.isNotEmpty() }?.let { shelf ->
+                item(key = "spotify-playlists") {
+                    Shelf(
+                        shelf = shelf,
+                        onItemClick = { item -> onItemClick(item, shelf.title) },
+                    )
                 }
             }
             when (state) {
